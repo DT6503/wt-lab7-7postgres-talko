@@ -21,11 +21,13 @@ if (!string.IsNullOrWhiteSpace(databaseUrl))
     var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':', 2);
 
-    // ИСПРАВЛЕНИЕ: Назвали переменную npgsqlBuilder, чтобы не конфликтовать с builder
+    // Если в URL не указан порт (uri.Port == -1), ставим стандартный 5432
+    int port = uri.Port > 0 ? uri.Port : 5432;
+
     var npgsqlBuilder = new Npgsql.NpgsqlConnectionStringBuilder
     {
         Host = uri.Host,
-        Port = uri.Port,
+        Port = port,
         Database = uri.AbsolutePath.TrimStart('/'),
         Username = Uri.UnescapeDataString(userInfo[0]),
         Password = Uri.UnescapeDataString(userInfo[1]),
@@ -34,10 +36,10 @@ if (!string.IsNullOrWhiteSpace(databaseUrl))
     };
 
     connectionString = npgsqlBuilder.ConnectionString;
-    Console.WriteLine($"Connection string built for host: {uri.Host}");
+    Console.WriteLine($"Connection string built for host: {uri.Host}, port: {port}");
 }
 
-// ИСПРАВЛЕНИЕ: Добавили EnableRetryOnFailure, чтобы приложение не падало, если база "спит"
+// Добавили EnableRetryOnFailure, чтобы приложение не падало, если база "спит"
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
         npgsqlOptions.EnableRetryOnFailure(
@@ -57,7 +59,6 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        // Если база не проснулась, приложение продолжит работу, а ошибка будет в логах
         Console.WriteLine($"!!! ОШИБКА МИГРАЦИИ !!!: {ex.Message}");
         Console.WriteLine(ex.StackTrace);
     }
