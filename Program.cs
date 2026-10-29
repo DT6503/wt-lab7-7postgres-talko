@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+var portStr = Environment.GetEnvironmentVariable("PORT");
+int port = int.TryParse(portStr, out var p) && p > 0 ? p : 10000;
+
+app.Run($"http://0.0.0.0:{port}");
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -242,5 +244,21 @@ app.MapGet("/api/dishes/sorted", async (AppDbContext db) =>
 // LINQ 3: Выборка с условием
 app.MapGet("/api/dishes/available", async (AppDbContext db) =>
     Results.Ok(await db.Dishes.Where(d => d.IsAvailable).OrderBy(d => d.Name).ToListAsync()));
+
+// Свой LINQ-запрос: группировка и подсчёт количества блюд по категориям
+app.MapGet("/api/dishes/stats", async (AppDbContext db) =>
+{
+    var stats = await db.Dishes
+        .GroupBy(d => d.Category)
+        .Select(g => new
+        {
+            Category = g.Key,
+            Count = g.Count(),
+            AveragePrice = g.Average(d => d.Price)
+        })
+        .ToListAsync();
+
+    return Results.Ok(stats);
+});
 
 app.Run();
