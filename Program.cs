@@ -1,6 +1,7 @@
 using wt_lab6_6minimalapi_talko.Data;
 using wt_lab6_6minimalapi_talko.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,17 +21,29 @@ if (!string.IsNullOrWhiteSpace(databaseUrl))
     var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':', 2);
 
-    var username = Uri.UnescapeDataString(userInfo[0]);
-    var password = Uri.UnescapeDataString(userInfo[1]);
-    var host = uri.Host;
-    var port = uri.Port;
-    var database = uri.AbsolutePath.TrimStart('/');
+    // ИСПРАВЛЕНИЕ: Назвали переменную npgsqlBuilder, чтобы не конфликтовать с builder
+    var npgsqlBuilder = new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        Username = Uri.UnescapeDataString(userInfo[0]),
+        Password = Uri.UnescapeDataString(userInfo[1]),
+        SslMode = Npgsql.SslMode.Require, // Обязательно для Render
+        TrustServerCertificate = true
+    };
 
-    // Формируем надежную строку подключения
-    connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Disable;Trust Server Certificate=true;";
+    connectionString = npgsqlBuilder.ConnectionString;
+    Console.WriteLine($"Connection string built for host: {uri.Host}");
 }
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+// ИСПРАВЛЕНИЕ: Добавили EnableRetryOnFailure, чтобы приложение не падало, если база "спит"
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null)));
 
 var app = builder.Build();
 
