@@ -92,6 +92,9 @@ namespace wt_lab6_6minimalapi_talko.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
+                    b.Property<int>("Weight")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.ToTable("Dishes");
@@ -105,7 +108,8 @@ namespace wt_lab6_6minimalapi_talko.Migrations
                             Description = "Классическая",
                             IsAvailable = true,
                             Name = "Пицца Маргарита",
-                            Price = 450m
+                            Price = 450m,
+                            Weight = 0
                         },
                         new
                         {
@@ -115,7 +119,8 @@ namespace wt_lab6_6minimalapi_talko.Migrations
                             Description = "С лососем",
                             IsAvailable = true,
                             Name = "Суши Филадельфия",
-                            Price = 599m
+                            Price = 599m,
+                            Weight = 0
                         });
                 });
 

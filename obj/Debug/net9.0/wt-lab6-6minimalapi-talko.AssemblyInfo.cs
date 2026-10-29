@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("wt-lab6-6minimalapi-talko")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bf1ec2559299a9c88e1c767b0b17aef28d9efee1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1b7111ab59709db8519d85dfa42e3fa34c3fbead")]
 [assembly: System.Reflection.AssemblyProductAttribute("wt-lab6-6minimalapi-talko")]
 [assembly: System.Reflection.AssemblyTitleAttribute("wt-lab6-6minimalapi-talko")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

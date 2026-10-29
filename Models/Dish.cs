@@ -9,4 +9,5 @@ public class Dish
     public bool IsAvailable { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string Description { get; set; } = "";
+    public int Weight { get; set; } // Вес в граммах
 }
