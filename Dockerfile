@@ -3,6 +3,7 @@ WORKDIR /src
 COPY *.csproj ./
 RUN dotnet restore
 COPY . ./
+RUN dotnet build  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
