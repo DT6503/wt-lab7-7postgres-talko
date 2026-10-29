@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\7semester\\WT\\lab6\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj": {}
+    "D:\\7semester\\WT\\lab7\\wt-lab7-7postgres-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj": {}
   },
   "projects": {
-    "D:\\7semester\\WT\\lab6\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj": {
+    "D:\\7semester\\WT\\lab7\\wt-lab7-7postgres-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\7semester\\WT\\lab6\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj",
+        "projectUniqueName": "D:\\7semester\\WT\\lab7\\wt-lab7-7postgres-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj",
         "projectName": "wt-lab6-6minimalapi-talko",
-        "projectPath": "D:\\7semester\\WT\\lab6\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj",
+        "projectPath": "D:\\7semester\\WT\\lab7\\wt-lab7-7postgres-talko\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko.csproj",
         "packagesPath": "C:\\Users\\Dashka\\.nuget\\packages\\",
-        "outputPath": "D:\\7semester\\WT\\lab6\\wt-lab6-6minimalapi-talko\\wt-lab6-6minimalapi-talko\\obj\\",
+        "outputPath": "D:\\7semester\\WT\\lab7\\wt-lab7-7postgres-talko\\wt-lab6-6minimalapi-talko\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -53,6 +53,16 @@
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[9.0.13, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[9.0.4, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",

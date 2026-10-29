@@ -1,82 +1,84 @@
 using wt_lab6_6minimalapi_talko.Data;
 using wt_lab6_6minimalapi_talko.Models;
-
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
-//builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// === НАСТРОЙКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ ===
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+
+// Если мы на Render (есть переменная DATABASE_URL), парсим её
+if (!string.IsNullOrWhiteSpace(databaseUrl))
+{
+    var uri = new Uri(databaseUrl);
+    var userInfo = uri.UserInfo.Split(':', 2);
+    connectionString = $"Host={uri.Host};" +
+                       $"Port={uri.Port};" +
+                       $"Database={uri.AbsolutePath.TrimStart('/')};" +
+                       $"Username={Uri.UnescapeDataString(userInfo[0])};" +
+                       $"Password={Uri.UnescapeDataString(userInfo[1])};" +
+                       "SSL Mode=Disable";
+}
+
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
 var app = builder.Build();
 
-//if (app.Environment.IsDevelopment())
-//{
-//    app.MapOpenApi();
-//}
+// === АВТОМАТИЧЕСКОЕ ПРИМЕНЕНИЕ МИГРАЦИЙ ===
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
-
-//app.MapOpenApi();
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapGet("/", () => "Minimal API is working!");
+app.MapGet("/api/info", () => new { Application = "Служба доставки еды", Version = "2.0 (PostgreSQL)" });
 
-app.MapGet("/api/info", () =>
-{
-    return new
-    {
-        Application = "Служба доставки еды",
-        Technology = "ASP.NET Core Minimal API",
-        Version = "1.0"
-    };
-});
+// ==========================================
+// БЛЮДА (DISHES)
+// ==========================================
 
-// GET: Список всех блюд (с поиском по query-параметру ?search=)
-app.MapGet("/api/dishes", (string? search) =>
+// GET: Список всех блюд (с поиском)
+app.MapGet("/api/dishes", async (string? search, AppDbContext db) =>
 {
-    var dishes = DishStore.Dishes.AsEnumerable();
+    var query = db.Dishes.AsQueryable();
     if (!string.IsNullOrWhiteSpace(search))
     {
-        dishes = dishes.Where(d => d.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+        query = query.Where(d => d.Name.ToLower().Contains(search.ToLower()));
     }
-    return Results.Ok(dishes);
+    return Results.Ok(await query.ToListAsync());
 });
 
 // GET: Блюдо по ID
-app.MapGet("/api/dishes/{id}", (int id) =>
+app.MapGet("/api/dishes/{id}", async (int id, AppDbContext db) =>
 {
-    var dish = DishStore.Dishes.FirstOrDefault(d => d.Id == id);
-    if (dish == null) return Results.NotFound();
-
-    return Results.Ok(dish);
+    var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
+    return dish == null ? Results.NotFound() : Results.Ok(dish);
 });
 
 // POST: Создать новое блюдо
-app.MapPost("/api/dishes", (Dish dish) =>
+app.MapPost("/api/dishes", async (Dish dish, AppDbContext db) =>
 {
-    // Автогенерация ID
-    dish.Id = DishStore.Dishes.Count == 0 ? 1 : DishStore.Dishes.Max(d => d.Id) + 1;
-
-    DishStore.Dishes.Add(dish);
-
-    // Возвращаем 201 Created и ссылку на созданный объект
+    dish.CreatedAt = DateTime.UtcNow;
+    db.Dishes.Add(dish);
+    await db.SaveChangesAsync();
     return Results.Created($"/api/dishes/{dish.Id}", dish);
 });
 
-// PUT: Обновить блюдо по ID
-app.MapPut("/api/dishes/{id}", (int id, Dish updatedDish) =>
+// PUT: Обновить блюдо
+app.MapPut("/api/dishes/{id}", async (int id, Dish updatedDish, AppDbContext db) =>
 {
-    var dish = DishStore.Dishes.FirstOrDefault(d => d.Id == id);
+    var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
     if (dish == null) return Results.NotFound();
 
     dish.Name = updatedDish.Name;
@@ -84,126 +86,128 @@ app.MapPut("/api/dishes/{id}", (int id, Dish updatedDish) =>
     dish.Price = updatedDish.Price;
     dish.IsAvailable = updatedDish.IsAvailable;
 
+    await db.SaveChangesAsync();
     return Results.Ok(dish);
 });
 
-// DELETE: Удалить блюдо по ID
-app.MapDelete("/api/dishes/{id}", (int id) =>
+// DELETE: Удалить блюдо
+app.MapDelete("/api/dishes/{id}", async (int id, AppDbContext db) =>
 {
-    var dish = DishStore.Dishes.FirstOrDefault(d => d.Id == id);
+    var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
     if (dish == null) return Results.NotFound();
 
-    DishStore.Dishes.Remove(dish);
-
-    // 204 No Content (успешно, но отвечать нечем)
+    db.Dishes.Remove(dish);
+    await db.SaveChangesAsync();
     return Results.NoContent();
 });
 
-// === API ДЛЯ КУРЬЕРОВ (Couriers) ===
+// ==========================================
+// КУРЬЕРЫ (COURIERS)
+// ==========================================
 
-app.MapGet("/api/couriers", () => Results.Ok(CourierStore.Couriers));
+app.MapGet("/api/couriers", async (AppDbContext db) => Results.Ok(await db.Couriers.ToListAsync()));
 
-app.MapGet("/api/couriers/{id}", (int id) =>
+app.MapGet("/api/couriers/{id}", async (int id, AppDbContext db) =>
 {
-    var courier = CourierStore.Couriers.FirstOrDefault(c => c.Id == id);
+    var courier = await db.Couriers.FirstOrDefaultAsync(c => c.Id == id);
     return courier == null ? Results.NotFound() : Results.Ok(courier);
 });
 
-// === ОБНОВЛЕНИЕ И УДАЛЕНИЕ КУРЬЕРОВ ===
-
-// PUT: Обновить данные курьера
-app.MapPut("/api/couriers/{id}", (int id, Courier updatedCourier) =>
+app.MapPost("/api/couriers", async (Courier courier, AppDbContext db) =>
 {
-    var courier = CourierStore.Couriers.FirstOrDefault(c => c.Id == id);
+    db.Couriers.Add(courier);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/couriers/{courier.Id}", courier);
+});
+
+app.MapPut("/api/couriers/{id}", async (int id, Courier updatedCourier, AppDbContext db) =>
+{
+    var courier = await db.Couriers.FirstOrDefaultAsync(c => c.Id == id);
     if (courier == null) return Results.NotFound();
 
     courier.FullName = updatedCourier.FullName;
     courier.Phone = updatedCourier.Phone;
     courier.Vehicle = updatedCourier.Vehicle;
 
+    await db.SaveChangesAsync();
     return Results.Ok(courier);
 });
 
-// DELETE: Удалить курьера
-app.MapDelete("/api/couriers/{id}", (int id) =>
+app.MapDelete("/api/couriers/{id}", async (int id, AppDbContext db) =>
 {
-    var courier = CourierStore.Couriers.FirstOrDefault(c => c.Id == id);
+    var courier = await db.Couriers.FirstOrDefaultAsync(c => c.Id == id);
     if (courier == null) return Results.NotFound();
-
-    CourierStore.Couriers.Remove(courier);
+    db.Couriers.Remove(courier);
+    await db.SaveChangesAsync();
     return Results.NoContent();
 });
 
-// === API ДЛЯ РЕСТОРАНОВ (Restaurants) ===
+// ==========================================
+// РЕСТОРАНЫ (RESTAURANTS)
+// ==========================================
 
-app.MapGet("/api/restaurants", () => Results.Ok(RestaurantStore.Restaurants));
+app.MapGet("/api/restaurants", async (AppDbContext db) => Results.Ok(await db.Restaurants.ToListAsync()));
 
-app.MapGet("/api/restaurants/{id}", (int id) =>
+app.MapGet("/api/restaurants/{id}", async (int id, AppDbContext db) =>
 {
-    var restaurant = RestaurantStore.Restaurants.FirstOrDefault(r => r.Id == id);
+    var restaurant = await db.Restaurants.FirstOrDefaultAsync(r => r.Id == id);
     return restaurant == null ? Results.NotFound() : Results.Ok(restaurant);
 });
 
-// === ОБНОВЛЕНИЕ И УДАЛЕНИЕ РЕСТОРАНОВ ===
-
-// PUT: Обновить данные ресторана
-app.MapPut("/api/restaurants/{id}", (int id, Restaurant updatedRestaurant) =>
+app.MapPost("/api/restaurants", async (Restaurant restaurant, AppDbContext db) =>
 {
-    var restaurant = RestaurantStore.Restaurants.FirstOrDefault(r => r.Id == id);
+    db.Restaurants.Add(restaurant);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/restaurants/{restaurant.Id}", restaurant);
+});
+
+app.MapPut("/api/restaurants/{id}", async (int id, Restaurant updatedRestaurant, AppDbContext db) =>
+{
+    var restaurant = await db.Restaurants.FirstOrDefaultAsync(r => r.Id == id);
     if (restaurant == null) return Results.NotFound();
 
     restaurant.Title = updatedRestaurant.Title;
     restaurant.Address = updatedRestaurant.Address;
     restaurant.Rating = updatedRestaurant.Rating;
 
+    await db.SaveChangesAsync();
     return Results.Ok(restaurant);
 });
 
-// DELETE: Удалить ресторан
-app.MapDelete("/api/restaurants/{id}", (int id) =>
+app.MapDelete("/api/restaurants/{id}", async (int id, AppDbContext db) =>
 {
-    var restaurant = RestaurantStore.Restaurants.FirstOrDefault(r => r.Id == id);
+    var restaurant = await db.Restaurants.FirstOrDefaultAsync(r => r.Id == id);
     if (restaurant == null) return Results.NotFound();
-
-    RestaurantStore.Restaurants.Remove(restaurant);
+    db.Restaurants.Remove(restaurant);
+    await db.SaveChangesAsync();
     return Results.NoContent();
 });
 
-// === API ДЛЯ ЗАКАЗОВ (Orders) ===
+// ==========================================
+// ЗАКАЗЫ (ORDERS)
+// ==========================================
 
-// 1. Получить все заказы
-app.MapGet("/api/orders", () => Results.Ok(OrderStore.Orders));
+app.MapGet("/api/orders", async (AppDbContext db) => Results.Ok(await db.Orders.ToListAsync()));
 
-// 2. Получить заказ по ID
-app.MapGet("/api/orders/{id}", (int id) =>
+app.MapGet("/api/orders/{id}", async (int id, AppDbContext db) =>
 {
-    var order = OrderStore.Orders.FirstOrDefault(o => o.Id == id);
+    var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == id);
     return order == null ? Results.NotFound() : Results.Ok(order);
 });
 
-// 3. Создать новый заказ (POST)
-app.MapPost("/api/orders", (Order order) =>
+app.MapPost("/api/orders", async (Order order, AppDbContext db) =>
 {
-    // Автогенерация ID
-    order.Id = OrderStore.Orders.Count == 0 ? 1 : OrderStore.Orders.Max(o => o.Id) + 1;
+    var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == order.DishId);
+    if (dish != null) order.TotalPrice = dish.Price;
 
-    // Автоматический расчет цены (ищем блюдо в базе и берем его цену)
-    var dish = DishStore.Dishes.FirstOrDefault(d => d.Id == order.DishId);
-    if (dish != null)
-    {
-        order.TotalPrice = dish.Price;
-    }
-
-    OrderStore.Orders.Add(order);
+    db.Orders.Add(order);
+    await db.SaveChangesAsync();
     return Results.Created($"/api/orders/{order.Id}", order);
 });
 
-// === ОБНОВЛЕНИЕ И УДАЛЕНИЕ ЗАКАЗОВ ===
-
-// PUT: Обновить заказ (изменить адрес, статус или курьера)
-app.MapPut("/api/orders/{id}", (int id, Order updatedOrder) =>
+app.MapPut("/api/orders/{id}", async (int id, Order updatedOrder, AppDbContext db) =>
 {
-    var order = OrderStore.Orders.FirstOrDefault(o => o.Id == id);
+    var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == id);
     if (order == null) return Results.NotFound();
 
     order.DishId = updatedOrder.DishId;
@@ -211,25 +215,32 @@ app.MapPut("/api/orders/{id}", (int id, Order updatedOrder) =>
     order.Address = updatedOrder.Address;
     order.Status = updatedOrder.Status;
 
-    // Пересчитываем цену, если поменялось блюдо
-    var dish = DishStore.Dishes.FirstOrDefault(d => d.Id == order.DishId);
-    if (dish != null)
-    {
-        order.TotalPrice = dish.Price;
-    }
+    var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == order.DishId);
+    if (dish != null) order.TotalPrice = dish.Price;
 
+    await db.SaveChangesAsync();
     return Results.Ok(order);
 });
 
-// DELETE: Удалить заказ
-app.MapDelete("/api/orders/{id}", (int id) =>
+app.MapDelete("/api/orders/{id}", async (int id, AppDbContext db) =>
 {
-    var order = OrderStore.Orders.FirstOrDefault(o => o.Id == id);
+    var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == id);
     if (order == null) return Results.NotFound();
-
-    OrderStore.Orders.Remove(order);
+    db.Orders.Remove(order);
+    await db.SaveChangesAsync();
     return Results.NoContent();
 });
 
+// LINQ 1: Фильтрация по цене
+app.MapGet("/api/dishes/expensive", async (AppDbContext db) =>
+    Results.Ok(await db.Dishes.Where(d => d.Price > 500).ToListAsync()));
+
+// LINQ 2: Сортировка
+app.MapGet("/api/dishes/sorted", async (AppDbContext db) =>
+    Results.Ok(await db.Dishes.OrderBy(d => d.Price).ToListAsync()));
+
+// LINQ 3: Выборка с условием
+app.MapGet("/api/dishes/available", async (AppDbContext db) =>
+    Results.Ok(await db.Dishes.Where(d => d.IsAvailable).OrderBy(d => d.Name).ToListAsync()));
 
 app.Run();
