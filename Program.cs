@@ -4,10 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Правильное определение порта (после того как builder создан)
 var portStr = Environment.GetEnvironmentVariable("PORT");
 int port = int.TryParse(portStr, out var p) && p > 0 ? p : 10000;
-
-app.Run($"http://0.0.0.0:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -31,6 +31,7 @@ if (!string.IsNullOrWhiteSpace(databaseUrl))
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
+// Сборка приложения (ВСЕ настройки должны быть ДО этой строки)
 var app = builder.Build();
 
 // === АВТОМАТИЧЕСКОЕ ПРИМЕНЕНИЕ МИГРАЦИЙ ===
@@ -50,7 +51,6 @@ app.MapGet("/api/info", () => new { Application = "Служба доставки еды", Version
 // БЛЮДА (DISHES)
 // ==========================================
 
-// GET: Список всех блюд (с поиском)
 app.MapGet("/api/dishes", async (string? search, AppDbContext db) =>
 {
     var query = db.Dishes.AsQueryable();
@@ -61,14 +61,12 @@ app.MapGet("/api/dishes", async (string? search, AppDbContext db) =>
     return Results.Ok(await query.ToListAsync());
 });
 
-// GET: Блюдо по ID
 app.MapGet("/api/dishes/{id}", async (int id, AppDbContext db) =>
 {
     var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
     return dish == null ? Results.NotFound() : Results.Ok(dish);
 });
 
-// POST: Создать новое блюдо
 app.MapPost("/api/dishes", async (Dish dish, AppDbContext db) =>
 {
     dish.CreatedAt = DateTime.UtcNow;
@@ -77,7 +75,6 @@ app.MapPost("/api/dishes", async (Dish dish, AppDbContext db) =>
     return Results.Created($"/api/dishes/{dish.Id}", dish);
 });
 
-// PUT: Обновить блюдо
 app.MapPut("/api/dishes/{id}", async (int id, Dish updatedDish, AppDbContext db) =>
 {
     var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
@@ -92,7 +89,6 @@ app.MapPut("/api/dishes/{id}", async (int id, Dish updatedDish, AppDbContext db)
     return Results.Ok(dish);
 });
 
-// DELETE: Удалить блюдо
 app.MapDelete("/api/dishes/{id}", async (int id, AppDbContext db) =>
 {
     var dish = await db.Dishes.FirstOrDefaultAsync(d => d.Id == id);
@@ -261,4 +257,4 @@ app.MapGet("/api/dishes/stats", async (AppDbContext db) =>
     return Results.Ok(stats);
 });
 
-app.Run();
+app.Run(); // В самом конце!
